@@ -59,6 +59,9 @@
             max-width: 80%;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
             border: 1px solid #e8e7e4;
+            min-height: 3rem;
+            display: flex;
+            align-items: center;
         }
 
         .message.user {
@@ -77,6 +80,7 @@
 
         .message-content {
             line-height: 1.5;
+            width: 100%;
         }
 
         .input-container {
@@ -95,6 +99,7 @@
             background: #ffffff;
             transition: border-color 0.2s;
             font-family: inherit;
+            overflow-y: hidden;
         }
 
         .message-input:focus {
@@ -132,6 +137,37 @@
             margin-top: 0.5rem;
         }
 
+        .loading-dots {
+            display: inline-block;
+        }
+
+        .loading-dots:after {
+            content: '';
+            animation: loading-dots 1.5s infinite;
+        }
+
+        @keyframes loading-dots {
+            0% { content: ''; }
+            25% { content: '.'; }
+            50% { content: '..'; }
+            75% { content: '...'; }
+            100% { content: ''; }
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.2em;
+            background-color: #2c2c2c;
+            animation: blink 1s infinite;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
         .loading.active {
             display: block;
         }
@@ -161,7 +197,7 @@
             <button class="send-button" id="sendButton" onclick="sendMessage()">发送</button>
         </div>
 
-        <div class="loading" id="loading">正在思考...</div>
+        <div class="loading" id="loading" style="display: none;">正在思考<span class="loading-dots"></span></div>
     </div>
 
     <script>
@@ -181,7 +217,7 @@
             messagesContainer.appendChild(messageDiv);
 
             if (isStreaming) {
-                contentDiv.textContent = '';
+                contentDiv.innerHTML = '<span class="cursor"></span>';
             } else {
                 contentDiv.textContent = content;
             }
@@ -197,7 +233,6 @@
             addMessage(question, true);
             messageInput.value = '';
             sendButton.disabled = true;
-            loading.classList.add('active');
 
             const assistantMessageContent = addMessage('', false, true);
 
@@ -227,15 +262,18 @@
                         break;
                     }
                     const chunk = decoder.decode(value, { stream: true });
-                    assistantMessageContent.textContent += chunk;
+                    assistantMessageContent.innerHTML = (assistantMessageContent.textContent || '') + chunk + '<span class="cursor"></span>';
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 }
+
+                // 移除最后的光标
+                const finalText = assistantMessageContent.textContent || '';
+                assistantMessageContent.textContent = finalText;
 
             } catch (error) {
                 assistantMessageContent.textContent = `网络错误：${error.message}`;
             } finally {
                 sendButton.disabled = false;
-                loading.classList.remove('active');
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
         }
