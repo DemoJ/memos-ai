@@ -26,49 +26,47 @@ class LLMService:
             http_client=http_client
         )
     
-    def generate_answer(self, question: str, context_docs: List[Dict[str, Any]]) -> Iterator[str]:
-        if not context_docs:
-            logger.warning("No context documents found for the question.")
-            yield "根据我现有的笔记，找不到相关信息。"
-            return
-
-        context_text = "\n\n".join([
-            f"笔记 {i+1}:\n{doc['content']}"
-            for i, doc in enumerate(context_docs)
-        ])
-
-        prompt = f"""请根据以下我的笔记内容来回答问题。如果笔记中没有相关信息，请明确说明"根据我现有的笔记，找不到相关信息"。
-
-我的笔记内容：
-{context_text}
-
-问题：{question}
-
-回答："""
-
+    def decide_tool(self, question: str, tools: List[Dict[str, Any]]):
+        logger.info(f"Deciding tool for question: '{question}'")
         try:
-            logger.info(f"Generating streaming answer for question: '{question}'")
+            response = self.client.chat.completions.create(
+                model=settings.llm_model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that decides which tool to use based on the user's question. Respond with only the tool call."},
+                    {"role": "user", "content": question}
+                ],
+                tools=tools,
+                tool_choice="auto"
+            )
+            return response.choices[0].message
+        except Exception as e:
+            logger.error(f"Error deciding tool: {e}", exc_info=True)
+            return None
+
+    def generate_answer_with_context(self, question: str, context: str) -> Iterator[str]:
+        logger.info(f"Generating answer for question '{question}' with provided context.")
+        
+        prompt = f"""Based on the following context, please answer the user's question.
+Context:
+---
+{context}
+---
+Question: {question}
+"""
+        try:
             stream = self.client.chat.completions.create(
                 model=settings.llm_model,
                 messages=[
-                    {"role": "system", "content": "你是一个基于用户个人笔记的问答助手。请根据提供的笔记内容准确回答问题，不要添加笔记中没有的信息。"},
+                    {"role": "system", "content": "You are a helpful assistant that answers questions based on the provided context."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=1500,
-                temperature=0.2,
                 stream=True
             )
             for chunk in stream:
-                if chunk.choices:
-                    content = chunk.choices[0].delta.content
-                    if content:
-                        yield content
-            logger.info("Successfully generated streaming answer.")
-        except APIError as e:
-            logger.error(f"OpenAI API error: {e}")
-            yield f"抱歉，调用LLM API时出现错误：{e}"
+                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
         except Exception as e:
-            logger.error(f"An unexpected error occurred: {e}", exc_info=True)
-            yield f"抱歉，生成回答时出现了未知错误：{str(e)}"
+            logger.error(f"Error generating answer with context: {e}", exc_info=True)
+            yield "Sorry, an error occurred while generating the answer."
 
 llm_service = LLMService()
