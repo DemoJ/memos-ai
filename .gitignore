@@ -1,0 +1,6 @@
+.claude
+.venv
+__pycache__
+vector_db
+.env
+*.db
