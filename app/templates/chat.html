@@ -168,6 +168,88 @@
             51%, 100% { opacity: 0; }
         }
 
+        /* Markdown 样式 */
+        .message-content h1, .message-content h2, .message-content h3 {
+            margin: 0.5em 0 0.25em 0;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        .message-content h1 {
+            font-size: 1.25em;
+            border-bottom: 1px solid #e8e7e4;
+            padding-bottom: 0.25em;
+        }
+
+        .message-content h2 {
+            font-size: 1.15em;
+        }
+
+        .message-content h3 {
+            font-size: 1.05em;
+        }
+
+        .message-content p {
+            margin: 0.5em 0;
+            line-height: 1.6;
+        }
+
+        .message-content ul, .message-content ol {
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }
+
+        .message-content li {
+            margin: 0.25em 0;
+            line-height: 1.5;
+        }
+
+        .message-content code {
+            background: #f5f4f2;
+            padding: 0.125em 0.25em;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.875em;
+        }
+
+        .message-content pre {
+            background: #f5f4f2;
+            padding: 0.75em;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+
+        .message-content pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+        }
+
+        .message-content blockquote {
+            border-left: 3px solid #e8e7e4;
+            padding-left: 0.75em;
+            margin: 0.5em 0;
+            color: #666;
+        }
+
+        .message-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 0.5em 0;
+        }
+
+        .message-content th, .message-content td {
+            border: 1px solid #e8e7e4;
+            padding: 0.5em;
+            text-align: left;
+        }
+
+        .message-content th {
+            background: #f8f7f4;
+            font-weight: 600;
+        }
+
         .loading.active {
             display: block;
         }
@@ -200,11 +282,34 @@
         <div class="loading" id="loading" style="display: none;">正在思考<span class="loading-dots"></span></div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         const messagesContainer = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         const loading = document.getElementById('loading');
+
+        // 配置marked
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            pedantic: false,
+            sanitize: false,
+            smartLists: true,
+            smartypants: false
+        });
+
+        function renderMarkdown(text) {
+            if (!text || text.trim() === '') return '';
+            
+            // 处理换行符
+            let processedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            
+            // 确保列表项正确格式化
+            processedText = processedText.replace(/^(\s*)([-*+])\s+/gm, '$1$2 ');
+            
+            return marked.parse(processedText);
+        }
 
         function addMessage(content, isUser = false, isStreaming = false) {
             const messageDiv = document.createElement('div');
@@ -219,7 +324,11 @@
             if (isStreaming) {
                 contentDiv.innerHTML = '<span class="cursor"></span>';
             } else {
-                contentDiv.textContent = content;
+                if (isUser) {
+                    contentDiv.textContent = content;
+                } else {
+                    contentDiv.innerHTML = renderMarkdown(content);
+                }
             }
             
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -254,21 +363,24 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let streaming = true;
+                let fullResponseText = ''; // 用于累积原始Markdown文本
 
                 while (streaming) {
                     const { done, value } = await reader.read();
                     if (done) {
                         streaming = false;
+                        // 移除光标并进行最终渲染
+                        assistantMessageContent.innerHTML = marked.parse(fullResponseText);
                         break;
                     }
                     const chunk = decoder.decode(value, { stream: true });
-                    assistantMessageContent.innerHTML = (assistantMessageContent.textContent || '') + chunk + '<span class="cursor"></span>';
+                    fullResponseText += chunk;
+                    
+                    // 实时渲染累积的Markdown文本
+                    assistantMessageContent.innerHTML = marked.parse(fullResponseText) + '<span class="cursor"></span>';
+                    
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 }
-
-                // 移除最后的光标
-                const finalText = assistantMessageContent.textContent || '';
-                assistantMessageContent.textContent = finalText;
 
             } catch (error) {
                 assistantMessageContent.textContent = `网络错误：${error.message}`;
