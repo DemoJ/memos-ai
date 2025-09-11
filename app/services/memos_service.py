@@ -4,7 +4,7 @@ from app.models.database import Memo
 from app.services.vector_store import vector_store
 from app.services.llm_service import llm_service
 from app.core.config import settings
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Iterator
 import os
 
 class MemosService:
@@ -49,7 +49,7 @@ class MemosService:
         
         return results
     
-    def answer_question(self, question: str) -> str:
+    def answer_question(self, question: str) -> Iterator[str]:
         relevant_memos = self.search_memos(question, limit=settings.max_search_results)
         return llm_service.generate_answer(question, relevant_memos)
 
