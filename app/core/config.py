@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     max_search_results: int = 5
     sync_interval_hours: int = 1
     proxy: Optional[str] = None
-    retrieval_score_threshold: float = Field(0.5, description="Threshold for filtering search results based on score")
+    retrieval_score_threshold: float = Field(0.7, description="Threshold for filtering search results based on score")
     
     class Config:
         env_file = ".env"

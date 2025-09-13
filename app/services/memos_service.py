@@ -25,29 +25,74 @@ class MemosService:
             ).all()
     
     def search_memos(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
-        search_results = vector_store.search(query, k=limit)
+        from sqlalchemy import or_
+
+        retrieved_memos = {}
+
+        # --- Phase 1: Semantic Search (Vector) ---
+        print(f"Phase 1: Performing semantic search for: '{query}'")
+        semantic_search_results = vector_store.search(query, k=limit)
         
-        # Log search results for debugging
-        print(f"Search query: {query}")
-        print(f"Search results: {search_results}")
-        
-        results = []
-        for memo_id, score in search_results:
-            # Filter out results with a score below the threshold
-            if score < settings.retrieval_score_threshold:
-                continue
+        top_score = 0
+        if semantic_search_results:
+            top_score = semantic_search_results[0][1]
+            print(f"Top semantic search score: {top_score}")
+            # Add all semantic results to the candidate pool
+            for memo_id, score in semantic_search_results:
+                if memo_id not in retrieved_memos:
+                    memo = self.get_memo_by_id(memo_id)
+                    if memo:
+                        retrieved_memos[memo_id] = {
+                            "memo": memo,
+                            "score": score,
+                            "source": "semantic"
+                        }
+
+        # --- Phase 2: Traditional Keyword Search (if needed) ---
+        if top_score < settings.retrieval_score_threshold:
+            print(f"Phase 2: Top score is below threshold. Triggering traditional keyword search.")
             
-            memo = self.get_memo_by_id(memo_id)
-            if memo:
-                results.append({
-                    "id": memo.id,
-                    "content": memo.content,
-                    "score": score,
-                    "created_at": memo.created_datetime.isoformat(),
-                    "updated_at": memo.updated_datetime.isoformat()
-                })
+            keywords = llm_service.extract_keywords(query)
+            if not keywords and len(query.split()) <= 3:
+                keywords = [query]
+            
+            print(f"Using keywords for traditional search: {keywords}")
+
+            if keywords:
+                with self.SessionLocal() as session:
+                    # Build a list of LIKE conditions
+                    like_conditions = [Memo.content.like(f"%{keyword}%") for keyword in keywords]
+                    # Query for memos that match any of the keywords
+                    keyword_search_results = session.query(Memo).filter(or_(*like_conditions)).limit(limit * 2).all()
+                    
+                    print(f"Found {len(keyword_search_results)} memos via traditional search.")
+                    
+                    # Add keyword results to the candidate pool
+                    for memo in keyword_search_results:
+                        if memo.id not in retrieved_memos:
+                             retrieved_memos[memo.id] = {
+                                "memo": memo,
+                                "score": 0, # Traditional search has no comparable score
+                                "source": "keyword"
+                            }
         
-        return results
+        # --- Phase 3: Format final results ---
+        final_results = []
+        for memo_id, data in retrieved_memos.items():
+            memo = data["memo"]
+            final_results.append({
+                "id": memo.id,
+                "content": memo.content,
+                "score": data["score"],
+                "source": data["source"],
+                "created_at": memo.created_datetime.isoformat(),
+                "updated_at": memo.updated_datetime.isoformat()
+            })
+
+        # Simple sort to bring keyword matches to the top if they exist
+        final_results.sort(key=lambda x: x['source'] == 'keyword', reverse=True)
+        
+        return final_results[:limit]
     
     def get_latest_memos(self, limit: int = 5) -> List[Dict[str, Any]]:
         with self.SessionLocal() as session:
@@ -127,14 +172,32 @@ class MemosService:
 
         # Step 3: Generate the final answer based on the tool's output
         if not retrieved_memos:
-            def empty_response():
-                yield "根据我现有的笔记，找不到相关信息。"
-            return empty_response()
+            # If no memos are found, use the LLM's general knowledge
+            def llm_fallback_response():
+                yield "（注意：以下内容为AI生成的通用回答，不代表个人笔记。）\n\n"
+                for chunk in llm_service.generate_answer_without_context(question):
+                    yield chunk
+            return llm_fallback_response()
 
         context = "\n\n".join([
             f"笔记 (ID: {memo['id']}, Created: {memo['created_at']}):\n{memo['content']}"
             for memo in retrieved_memos
         ])
+
+        # Add a log to print the context for debugging
+        print("--- CONTEXT FOR LLM ---")
+        print(context)
+        print("-----------------------")
+
+        # Step 4: Validate context relevance before generating the final answer
+        is_relevant = llm_service.validate_context_relevance(question, context)
+        if not is_relevant:
+            # If context is not relevant, use the LLM's general knowledge
+            def llm_fallback_response():
+                yield "（注意：以下内容为AI生成的通用回答，不代表个人笔记。）\n\n"
+                for chunk in llm_service.generate_answer_without_context(question):
+                    yield chunk
+            return llm_fallback_response()
 
         return llm_service.generate_answer_with_context(question, context)
 

@@ -7,11 +7,11 @@ Memos AI Sync Script
 import os
 import sys
 import time
-from datetime import datetime, timedelta
+import re
+from datetime import datetime
 
 import faiss
-from sentence_transformers import SentenceTransformer
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 # 添加项目根目录到 Python 路径，以确保可以正确导入 app 模块
@@ -21,6 +21,34 @@ sys.path.insert(0, project_root)
 from app.core.config import settings  # noqa: E402
 from app.models.database import Memo  # noqa: E402
 from app.services.vector_store import vector_store  # noqa: E402
+
+
+
+
+def filter_sensitive_memos(memos: list) -> list:
+    """过滤掉包含敏感信息的笔记"""
+    sensitive_keywords = ["密码", "password","密钥", "token"]
+    sensitive_tags = ["#密码"]
+    
+    def is_sensitive(memo_content: str) -> bool:
+        # 检查关键词
+        if any(keyword in memo_content.lower() for keyword in sensitive_keywords):
+            return True
+        # 检查标签
+        if any(re.search(rf'{tag}\b', memo_content, re.IGNORECASE) for tag in sensitive_tags):
+            return True
+        return False
+
+    original_count = len(memos)
+    filtered_memos = [memo for memo in memos if not is_sensitive(memo.content)]
+    
+    # 打印过滤日志
+    num_filtered = original_count - len(filtered_memos)
+    if num_filtered > 0:
+        print(f"已过滤 {num_filtered} 条包含敏感信息的笔记")
+        
+    return filtered_memos
+
 
 class MemosSync:
     def __init__(self):
@@ -54,6 +82,8 @@ class MemosSync:
                 Memo.visibility == "PRIVATE",
                 Memo.updated_ts > self.last_sync_time
             ).all()
+            
+            changed_memos = filter_sensitive_memos(changed_memos)
             
             # 获取所有当前有效的笔记ID
             current_memo_ids = {memo.id for memo in session.query(Memo).filter(
@@ -120,6 +150,8 @@ class MemosSync:
                     Memo.row_status == "NORMAL",
                     Memo.visibility == "PRIVATE"
                 ).all()
+                
+                all_memos = filter_sensitive_memos(all_memos)
                 
                 # 清空向量数据库
                 vector_store.index = faiss.IndexFlatIP(vector_store.dimension)
