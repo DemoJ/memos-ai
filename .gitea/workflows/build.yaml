@@ -1,0 +1,24 @@
+name: Build and push Docker image
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    container:
+      image: catthehacker/ubuntu:act-latest
+
+    steps:
+      - name: Checkout code
+        uses: http://git.diyun.work/diyun/checkout@v2
+
+      - name: Build and push Docker image with multiple tags
+        uses: http://git.diyun.work/diyun/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            registry.diyun.work/memos_ai:v${{ github.run_number }}
+            registry.diyun.work/memos_ai:latest
