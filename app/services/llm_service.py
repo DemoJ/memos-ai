@@ -3,10 +3,37 @@ from openai import OpenAI
 from app.core.config import settings
 from typing import List, Dict, Any, Iterator
 import httpx
+import re
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def filter_sensitive_content(context: str) -> str:
+    """从上下文中过滤敏感信息"""
+    # 将笔记内容按分隔符拆分
+    notes = context.split("---")
+    
+    sensitive_keywords = ["密码", "password", "密钥", "token"]
+    sensitive_tags = ["#密码"]
+    
+    def is_sensitive(note_content: str) -> bool:
+        # 检查关键词
+        if any(keyword in note_content.lower() for keyword in sensitive_keywords):
+            return True
+        # 检查标签
+        if any(re.search(rf'{tag}\b', note_content, re.IGNORECASE) for tag in sensitive_tags):
+            return True
+        return False
+
+    filtered_notes = [note for note in notes if not is_sensitive(note)]
+    
+    num_filtered = len(notes) - len(filtered_notes)
+    if num_filtered > 0:
+        logger.info(f"已从上下文中过滤 {num_filtered} 条敏感笔记")
+        
+    return "---".join(filtered_notes)
 
 
 class LLMService:
@@ -46,10 +73,13 @@ class LLMService:
     def generate_answer_with_context(self, question: str, context: str) -> Iterator[str]:
         logger.info(f"Generating answer for question '{question}' with provided context.")
         
+        # 在生成答案前过滤上下文
+        filtered_context = filter_sensitive_content(context)
+        
         prompt = f"""Based on the following context, please answer the user's question.
 Context:
 ---
-{context}
+{filtered_context}
 ---
 Question: {question}
 """

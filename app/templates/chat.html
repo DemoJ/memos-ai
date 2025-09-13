@@ -40,6 +40,8 @@
             padding: 1rem;
             display: flex;
             flex-direction: column;
+            position: relative;
+            overflow: hidden; /* 防止外层滚动 */
         }
 
         .messages {
@@ -49,7 +51,9 @@
             background: #f8f7f4;
             border-radius: 0;
             box-shadow: none;
-            margin-bottom: 1rem;
+            margin-bottom: 0;
+            /* 为输入框留出空间 */
+            padding-bottom: 100px;
         }
 
         .message {
@@ -84,8 +88,16 @@
         }
 
         .input-container {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            right: 1rem;
             display: flex;
             gap: 0.5rem;
+            background: #f8f7f4;
+            padding: 0;
+            z-index: 100;
+            background: transparent;
         }
 
         .message-input {
@@ -253,6 +265,45 @@
         .loading.active {
             display: block;
         }
+
+        /* 自定义滚动条样式 - 隐藏式设计 */
+        .messages::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .messages::-webkit-scrollbar-thumb {
+            background-color: transparent;
+            border-radius: 2px;
+            transition: background-color 0.3s ease;
+        }
+
+        .messages:hover::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.15);
+        }
+
+        .messages:active::-webkit-scrollbar-thumb,
+        .messages:focus::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.25);
+        }
+
+        .messages {
+            scrollbar-width: thin;
+            scrollbar-color: transparent transparent;
+            transition: scrollbar-color 0.3s ease;
+        }
+
+        .messages:hover {
+            scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+        }
+
+        .messages:active,
+        .messages:focus {
+            scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+        }
     </style>
 </head>
 <body>
@@ -270,9 +321,9 @@
         </div>
 
         <div class="input-container">
-            <textarea 
-                class="message-input" 
-                id="messageInput" 
+            <textarea
+                class="message-input"
+                id="messageInput"
                 placeholder="输入你的问题..."
                 rows="1"
             ></textarea>
@@ -331,8 +382,15 @@
                 }
             }
             
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            scrollToBottomSmooth();
             return contentDiv;
+        }
+
+        function scrollToBottomSmooth() {
+            messagesContainer.scrollTo({
+                top: messagesContainer.scrollHeight,
+                behavior: 'smooth'
+            });
         }
 
         async function sendMessage() {
@@ -379,14 +437,14 @@
                     // 实时渲染累积的Markdown文本
                     assistantMessageContent.innerHTML = marked.parse(fullResponseText) + '<span class="cursor"></span>';
                     
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    scrollToBottomSmooth();
                 }
 
             } catch (error) {
                 assistantMessageContent.textContent = `网络错误：${error.message}`;
             } finally {
                 sendButton.disabled = false;
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                scrollToBottomSmooth();
             }
         }
 
