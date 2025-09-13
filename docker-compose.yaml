@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  memos-ai-assistant:
+    # 使用当前目录下的 Dockerfile 进行构建
+    build: .
+    # 为构建的镜像命名
+    image: memos-ai-assistant:latest
+    # 为容器命名
+    container_name: memos-ai-container
+    # 设置重启策略，除非手动停止，否则容器会自动重启
+    restart: unless-stopped
+    # 将 .env 文件中的环境变量加载到容器中
+    env_file:
+      - .env
+    # 端口映射：将宿主机的 9876 端口映射到容器的 8000 端口
+    ports:
+      - "9876:8000"
