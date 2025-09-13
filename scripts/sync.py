@@ -1,28 +1,143 @@
 #!/usr/bin/env python3
 """
 Memos AI Sync Script
-自动同步 Memos 笔记到向量数据库
+自动同步 Memos 笔记到向量数据库 (独立运行版)
 """
 
 import os
 import sys
 import time
 import re
+import pickle
 from datetime import datetime
+from typing import List, Tuple
 
 import faiss
-from sqlalchemy import create_engine
+import numpy as np
+from sqlalchemy import create_engine, Column, Integer, String, Text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sentence_transformers import SentenceTransformer
 
-# 添加项目根目录到 Python 路径，以确保可以正确导入 app 模块
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_root)
+# --- 独立配置 ---
+# 默认配置。如果需要自定义路径，请直接修改此处的代码。
+class Settings:
+    memos_db_path: str = "./memos_prod.db"
+    vector_db_path: str = "./vector_db"
+    embedding_model: str = "all-MiniLM-L6-v2"
 
-from app.core.config import settings  # noqa: E402
-from app.models.database import Memo  # noqa: E402
-from app.services.vector_store import vector_store  # noqa: E402
+settings = Settings()
 
 
+# --- 从 app.models.database 复制过来的模型 ---
+Base = declarative_base()
+
+class Memo(Base):
+    __tablename__ = "memo"
+    
+    id = Column(Integer, primary_key=True)
+    content = Column(Text, nullable=False)
+    created_ts = Column(Integer, nullable=False)
+    updated_ts = Column(Integer, nullable=False)
+    row_status = Column(String, default="NORMAL")
+    visibility = Column(String, default="PRIVATE")
+
+
+# --- 从 app.services.vector_store 复制过来的服务 ---
+class VectorStore:
+    def __init__(self):
+        # 强制在 CPU 上运行，以避免 GPU 兼容性问题
+        self.model = SentenceTransformer(settings.embedding_model, device='cpu')
+        self.dimension = self.model.get_sentence_embedding_dimension()
+        self.index = None
+        self.id_map = {}
+        self.load_or_create_index()
+    
+    def load_or_create_index(self):
+        index_path = os.path.join(settings.vector_db_path, "faiss.index")
+        map_path = os.path.join(settings.vector_db_path, "id_map.pkl")
+        
+        if os.path.exists(index_path) and os.path.exists(map_path):
+            self.index = faiss.read_index(index_path)
+            with open(map_path, 'rb') as f:
+                self.id_map = pickle.load(f)
+        else:
+            os.makedirs(settings.vector_db_path, exist_ok=True)
+            self.index = faiss.IndexFlatIP(self.dimension)
+    
+    def add_documents(self, documents: List[str], doc_ids: List[int]) -> List[int]:
+        if not documents:
+            return []
+        
+        embeddings = self.model.encode(documents, convert_to_numpy=True)
+        embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+        
+        start_idx = self.index.ntotal
+        self.index.add(embeddings.astype(np.float32))
+        
+        for i, doc_id in enumerate(doc_ids):
+            self.id_map[start_idx + i] = doc_id
+        
+        self.save_index()
+        return [start_idx + i for i in range(len(documents))]
+    
+    def search(self, query: str, k: int = 5) -> List[Tuple[int, float]]:
+        if self.index.ntotal == 0:
+            return []
+        
+        query_embedding = self.model.encode([query], convert_to_numpy=True)
+        query_embedding = query_embedding / np.linalg.norm(query_embedding)
+        
+        scores, indices = self.index.search(query_embedding.astype(np.float32), k)
+        
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx in self.id_map and idx != -1:
+                memo_id = self.id_map[idx]
+                results.append((memo_id, float(score)))
+        
+        return results
+    
+    def delete_documents(self, doc_ids: List[int]):
+        # 查找与 doc_ids 对应的 faiss 索引
+        indices_to_remove = [k for k, v in self.id_map.items() if v in doc_ids]
+        
+        if indices_to_remove:
+            # 更新 id_map：创建一个新的 map，只包含不需要删除的条目
+            new_id_map = {k: v for k, v in self.id_map.items() if k not in indices_to_remove}
+            
+            # 重建索引
+            # 1. 获取所有剩余的向量
+            remaining_indices = sorted(list(new_id_map.keys()))
+            if not remaining_indices:
+                 # 如果没有剩余的向量，则创建一个新的空索引
+                self.index = faiss.IndexFlatIP(self.dimension)
+                self.id_map = {}
+            else:
+                remaining_vectors = self.index.reconstruct_n(0, self.index.ntotal)
+                # 过滤掉要删除的向量
+                vectors_to_keep = np.delete(remaining_vectors, indices_to_remove, axis=0)
+
+                # 创建一个新的索引并添加剩余的向量
+                new_index = faiss.IndexFlatIP(self.dimension)
+                new_index.add(vectors_to_keep)
+                self.index = new_index
+
+                # 更新 id_map，重新映射索引
+                self.id_map = {i: new_id_map[old_idx] for i, old_idx in enumerate(remaining_indices)}
+
+            self.save_index()
+
+    def save_index(self):
+        index_path = os.path.join(settings.vector_db_path, "faiss.index")
+        map_path = os.path.join(settings.vector_db_path, "id_map.pkl")
+        
+        faiss.write_index(self.index, index_path)
+        with open(map_path, 'wb') as f:
+            pickle.dump(self.id_map, f)
+
+# 实例化向量存储
+vector_store = VectorStore()
 
 
 def filter_sensitive_memos(memos: list) -> list:
@@ -52,7 +167,13 @@ def filter_sensitive_memos(memos: list) -> list:
 
 class MemosSync:
     def __init__(self):
+        # 确保 memos_db_path 是绝对路径或相对于当前工作目录的正确路径
         db_path = os.path.abspath(settings.memos_db_path)
+        if not os.path.exists(db_path):
+            print(f"错误: 数据库文件不存在于 '{db_path}'")
+            print("请确保 memos_db_path 在 .env 文件中配置正确，或者数据库文件在当前目录中。")
+            sys.exit(1)
+            
         self.engine = create_engine(f"sqlite:///{db_path}")
         self.SessionLocal = sessionmaker(bind=self.engine)
         

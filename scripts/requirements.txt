@@ -1,8 +1,10 @@
-# 此文件包含在宿主机上运行同步脚本所需的依赖
+# 此文件包含在宿主机上独立运行同步脚本所需的依赖
 
+# 为了减小体积并避免 GPU 兼容性问题，我们指定安装仅 CPU 版本的 PyTorch
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+
+# 其他核心依赖
 faiss-cpu>=1.12.0
 sentence-transformers==5.1.0
 sqlalchemy==1.4.52
-pydantic>=2.5.0
-pydantic-settings==2.10.1
-python-dotenv==1.0.0

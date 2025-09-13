@@ -8,7 +8,8 @@ from app.core.config import settings
 
 class VectorStore:
     def __init__(self):
-        self.model = SentenceTransformer(settings.embedding_model)
+        # 强制在 CPU 上运行，以避免 GPU 兼容性问题并减小依赖体积
+        self.model = SentenceTransformer(settings.embedding_model, device='cpu')
         self.dimension = self.model.get_sentence_embedding_dimension()
         self.index = None
         self.id_map = {}
