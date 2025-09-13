@@ -4,21 +4,26 @@
 // @version      0.1
 // @description  Adds a floating AI assistant window to Memos.
 // @author       Roo
-// @match        http://10.18.1.14:5230/*
+// @match        http://10.8.8.14:5230/*
 // @grant        GM_addStyle
 // ==/UserScript==
 
 (function() {
     'use strict';
 
+    // Stop the script from running in iframes
+    if (window.self !== window.top) {
+        return;
+    }
+
     // --- Configuration ---
-    const assistantUrl = "http://10.18.1.14:9876"; // Your AI Assistant URL
-    const iconUrl = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxZW0iIGhlaWdodD0iMWVtIiB2aWV3Qm94PSIwIDAgMjQgMjQiPjxwYXRoIGZpbGw9ImN1cnJlbnRDb2xvciIgZD0iTTEyIDJDNi40NzcgMiAyIDYuNDc3IDIgMTJzNC40NzcgMTAgMTAgMTBzMTAtNC40NzcgMTAtMTBTMTcuNTIzIDIgMTIgMm00LjQxNCAxMS40NzZhMSAxIDAgMCAxIC4wMDEgMS40MTVsLTIuMTIyIDIuMTIyYTEgMSAwIDAgMS0xLjQxNSAwTDEyIDUuNDE0bC0uODc5Ljg3OWExIDEgMCAwIDEtMS40MTUgMEw3LjU4NiA0LjE3MmExIDEgMCAwIDEgMC0xLjQxNWwyLjEyMS0yLjEyMmExIDEgMCAwIDEgMS40MTUgMGwxLjQxNCAxLjQxNGwxLjQxNC0xLjQxNGExIDEgMCAwIDEgMS40MTUgMGwyLjEyMiAyLjEyMmExIDEgMCAwIDEgMCAxLjQxNWwtMi4xMjIgMi4xMjFsLjg4Ljg3OW0tMS40MTUtNS42NTdsLS43MDcuNzA3bC43MDcuNzA3bDIuMTIyLTIuMTIybC0uNzA3LS43MDdtLTQuOTUgNC45NWwtMS40MTQtMS40MTRsLTEuNDEzIDEuNDE0bC43MDYuNzA3bDEuNDE1LTEuNDE0bDEuNDE0IDEuNDE0bC0uNzA3LjcwN20tMy41MzYtMy41MzZsLS43MDctLjcwN2wtMi4xMjIgMi4xMjJsLjcwNy43MDdaIj48L3BhdGg+PC9zdmc+"; // A simple robot icon
+    const assistantUrl = "http://10.8.8.14:9877"; // Your AI Assistant URL
+    const iconUrl = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxZW0iIGhlaWdodD0iMWVtIiB2aWV3Qm94PSIwIDAgMjQgMjQiPjxwYXRoIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzg4OCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjIiIGQ9Ik0xMiAzTDkuNSA4LjVMNCAxMWw1LjUgMi41TDEyIDE5bDIuNS01LjVMMjAgMTFsLTUuNS0yLjV6Ii8+PC9zdmc+"; // A simple AI icon
 
     // --- Create Floating Icon ---
     const floatIcon = document.createElement('div');
     floatIcon.id = 'ai-assistant-icon';
-    floatIcon.innerHTML = `<img src="${iconUrl}" style="width: 32px; height: 32px;">`;
+    floatIcon.innerHTML = `<img src="${iconUrl}" style="width: 28px; height: 28px;">`;
     document.body.appendChild(floatIcon);
 
     // --- Create Assistant Window ---
@@ -41,25 +46,27 @@
             right: 30px;
             width: 50px;
             height: 50px;
-            background-color: #007bff;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
             border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
             cursor: pointer;
             z-index: 9998;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            transition: background-color 0.3s;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            transition: background-color 0.3s, box-shadow 0.3s;
         }
         #ai-assistant-icon:hover {
-            background-color: #0056b3;
+            background-color: #f5f5f5;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         #ai-assistant-window {
             position: fixed;
             bottom: 90px;
             right: 30px;
-            width: 400px;
-            height: 600px;
+            width: 600px;
+            height: 700px;
             background-color: white;
             border: 1px solid #ccc;
             border-radius: 8px;
