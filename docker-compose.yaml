@@ -1,6 +1,6 @@
 services:
-  memos-ai:  # 添加服务名称
-    image: registry.diyun.work/memos_ai:latest
+  memos-ai:
+    build: .
     container_name: memos-ai
     restart: unless-stopped
     volumes:
