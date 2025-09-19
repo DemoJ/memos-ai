@@ -193,14 +193,6 @@ python scripts/sync.py --verbose
 - API 密钥完全由你本地保管，仅用于调用你指定的 API 服务。
 - 建议定期备份向量数据库
 
-## 更新日志
-
-### v1.0.0
-- 基础问答功能
-- 自动同步功能
-- 增量更新机制
-- Web 界面
-
 ## 贡献指南
 
 欢迎提交 Issue 和 Pull Request！
