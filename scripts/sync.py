@@ -19,16 +19,14 @@ from pydantic_settings import BaseSettings
 from sqlalchemy import create_engine, Column, Integer, String, Text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sentence_transformers import SentenceTransformer
-
 # --- 独立配置 ---
 # 从 scripts/.env 文件加载配置
 class Settings(BaseSettings):
     memos_db_path: str = "./memos_prod.db"
     vector_db_path: str = "./vector_db"
-    embedding_model: str = "all-MiniLM-L6-v2"
-    embedding_api_url: Optional[str] = None
-    embedding_api_key: Optional[str] = None
+    embedding_model: str
+    embedding_api_url: str
+    embedding_api_key: str
 
     class Config:
         env_file = os.path.join(os.path.dirname(__file__), '.env')
@@ -54,52 +52,41 @@ class Memo(Base):
 # --- 从 app.services.vector_store 复制过来的服务 ---
 class VectorStore:
     def __init__(self):
-        self.use_remote_embedding = bool(settings.embedding_api_url and settings.embedding_api_key)
-        
-        if self.use_remote_embedding:
-            self.model = None
-            self.dimension = None # Will be set on first embedding
-        else:
-            # 强制在 CPU 上运行，以避免 GPU 兼容性问题
-            self.model = SentenceTransformer(settings.embedding_model, device='cpu')
-            self.dimension = self.model.get_sentence_embedding_dimension()
-
+        self.model = None
+        self.dimension = None # Will be set on first embedding
         self.index = None
         self.id_map = {}
         self.load_or_create_index()
 
     def _get_embeddings(self, texts: List[str]) -> np.ndarray:
-        if self.use_remote_embedding:
-            headers = {
-                'Authorization': f'Bearer {settings.embedding_api_key}',
-                'Content-Type': 'application/json'
-            }
-            # The user's example shows sending one text at a time.
-            # However, many APIs support batching in the 'input' field.
-            # Let's try batching first for efficiency.
-            payload = {
-                "model": settings.embedding_model,
-                "input": texts
-            }
-            try:
-                # Combine base URL from settings with the specific endpoint path
-                url = f"{settings.embedding_api_url.rstrip('/')}/v1/embeddings"
-                response = requests.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                data = response.json()
-                
-                # Based on OpenAI format, response should have a 'data' field which is a list of embedding objects
-                embeddings = np.array([item['embedding'] for item in data['data']])
-                return embeddings
+        headers = {
+            'Authorization': f'Bearer {settings.embedding_api_key}',
+            'Content-Type': 'application/json'
+        }
+        # The user's example shows sending one text at a time.
+        # However, many APIs support batching in the 'input' field.
+        # Let's try batching first for efficiency.
+        payload = {
+            "model": settings.embedding_model,
+            "input": texts
+        }
+        try:
+            # Combine base URL from settings with the specific endpoint path
+            url = f"{settings.embedding_api_url.rstrip('/')}/v1/embeddings"
+            response = requests.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Based on OpenAI format, response should have a 'data' field which is a list of embedding objects
+            embeddings = np.array([item['embedding'] for item in data['data']])
+            return embeddings
 
-            except requests.exceptions.RequestException as e:
-                print(f"Error calling embedding API: {e}")
-                raise
-            except (KeyError, IndexError) as e:
-                print(f"Failed to parse API response. Unexpected format: {e}")
-                raise
-        else:
-            return self.model.encode(texts, convert_to_numpy=True)
+        except requests.exceptions.RequestException as e:
+            print(f"Error calling embedding API: {e}")
+            raise
+        except (KeyError, IndexError) as e:
+            print(f"Failed to parse API response. Unexpected format: {e}")
+            raise
 
     def load_or_create_index(self):
         index_path = os.path.join(settings.vector_db_path, "faiss.index")

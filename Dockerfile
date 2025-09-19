@@ -9,10 +9,6 @@ COPY requirements.txt .
 
 # 安装依赖
 # 使用 --no-cache-dir 减小镜像体积
-# 为了减小镜像体积，我们先安装一个仅 CPU 版本的 PyTorch
-# sentence-transformers 会自动使用这个已安装的版本
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-
 # 安装 requirements.txt 中定义的其他依赖
 RUN pip install --no-cache-dir -r requirements.txt
 

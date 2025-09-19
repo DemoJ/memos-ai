@@ -4,11 +4,17 @@
 
 这是一个基于个人 Memos 笔记的智能问答助手，能够理解你的问题并仅根据你的笔记内容给出准确回答。
 
+## 更新说明
+经实际实验后，在线向量模型api消耗较小，故全部改为使用在线向量模型api，以减小打包大小。
+
+如需要本地向量模型，之前的代码已经备份到：https://github.com/DemoJ/memos-ai-cpu
+
+
 ## 功能特点
 
 - **智能问答**：基于语义搜索 + LLM 生成准确回答
 - **知识同步**：自动同步 Memos 笔记的增删改
-- **本地部署**：数据完全本地，保护隐私
+- **数据本地**：Memos 数据库和向量索引存储在本地，保护隐私
 - **增量更新**：只处理变动的笔记，高效同步
 
 ## 快速开始
@@ -55,22 +61,29 @@ python -m app.main
 ### 环境变量 (.env)
 
 ```bash
-# OpenAI API 配置
+# --- 必需配置 ---
+
+# OpenAI API 配置 (用于语言模型)
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=gpt-3.5-turbo
 
-# 数据库配置
+# 在线 Embedding 服务配置 (用于向量化)
+# 兼容 OpenAI Embedding API 格式
+EMBEDDING_API_URL=your_embedding_api_url_here
+EMBEDDING_API_KEY=your_embedding_api_key_here
+EMBEDDING_MODEL=your_embedding_model_name # 例如: bge-m3
+
+# --- 可选配置 ---
+
+# 数据库路径
 MEMOS_DB_PATH=./memos_prod.db
 VECTOR_DB_PATH=./vector_db
 
-# 模型配置
-EMBEDDING_MODEL=all-MiniLM-L6-v2
-LLM_MODEL=gpt-3.5-turbo
-
-# 搜索配置
+# 搜索结果数量
 MAX_SEARCH_RESULTS=5
 
-# 同步配置
+# 自动同步间隔 (小时)
 SYNC_INTERVAL_HOURS=1
 ```
 
@@ -167,16 +180,17 @@ python scripts/sync.py --verbose
 ## 技术栈
 
 - **后端**: FastAPI + SQLAlchemy
-- **向量搜索**: FAISS + Sentence Transformers
+- **向量搜索**: FAISS + 在线 Embedding 服务
 - **LLM**: OpenAI GPT-3.5/4
 - **数据库**: SQLite (Memos)
 - **前端**: 原生 HTML/CSS/JS
 
 ## 安全说明
 
-- 所有数据处理都在本地完成
-- 不会上传你的笔记内容到第三方
-- API 密钥仅用于调用 LLM 服务
+- Memos 数据库和生成的向量索引完全存储在本地。
+- 笔记内容会发送至你配置的在线 Embedding 服务以生成向量。
+- 笔记内容和相关向量会发送至你配置的 LLM 服务（如 OpenAI）以生成回答。
+- API 密钥完全由你本地保管，仅用于调用你指定的 API 服务。
 - 建议定期备份向量数据库
 
 ## 更新日志
@@ -190,6 +204,14 @@ python scripts/sync.py --verbose
 ## 贡献指南
 
 欢迎提交 Issue 和 Pull Request！
+
+## 特别致谢
+
+X-AIO提供API额度供本项目研究使用，特别感谢！
+
+X - All in one ：基于分布式AI算力的 LLM API 平台
+
+官网地址：https://www.x-aio.com
 
 ## 许可证
 

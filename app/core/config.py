@@ -7,10 +7,10 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     memos_db_path: str = "./memos_prod.db"
     vector_db_path: str = "./vector_db"
-    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_model: str
     llm_model: str = "gpt-3.5-turbo"
-    embedding_api_url: Optional[str] = None
-    embedding_api_key: Optional[str] = None
+    embedding_api_url: str
+    embedding_api_key: str
     max_search_results: int = 5
     sync_interval_hours: int = 1
     proxy: Optional[str] = None
