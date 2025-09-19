@@ -199,7 +199,7 @@ python scripts/sync.py --verbose
 
 ## 特别致谢
 
-X-AIO和![李寻欢](https://github.com/lixh00)提供API额度供本项目研究使用，特别感谢!
+X-AIO和[李寻欢](https://github.com/lixh00)提供API额度供本项目研究使用，特别感谢!
 
 X - All in one ：基于分布式AI算力的 LLM API 平台
 
