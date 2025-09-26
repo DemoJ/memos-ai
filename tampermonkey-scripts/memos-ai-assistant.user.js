@@ -10,6 +10,11 @@
 
 (function() {
     'use strict';
+    
+    // 🎯 添加端口号检查
+    if (window.location.port !== '5230') {
+        return; // 如果端口不是 5230，则直接退出，不执行后续代码
+    }
 
     // Stop the script from running in iframes
     if (window.self !== window.top) {
