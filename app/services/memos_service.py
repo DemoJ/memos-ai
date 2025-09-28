@@ -16,6 +16,10 @@ class MemosService:
     def get_memo_by_id(self, memo_id: int) -> Memo:
         with self.SessionLocal() as session:
             return session.query(Memo).filter(Memo.id == memo_id).first()
+
+    def get_memo_by_name(self, memo_name: str) -> Memo:
+        with self.SessionLocal() as session:
+            return session.query(Memo).filter(Memo.name == memo_name).first()
     
     def get_all_active_memos(self) -> List[Memo]:
         with self.SessionLocal() as session:
@@ -31,22 +35,33 @@ class MemosService:
 
         # --- Phase 1: Semantic Search (Vector) ---
         print(f"Phase 1: Performing semantic search for: '{query}'")
+        # vector_store.search now returns (name, content, score)
         semantic_search_results = vector_store.search(query, k=limit)
         
         top_score = 0
         if semantic_search_results:
-            top_score = semantic_search_results[0][1]
+            from collections import namedtuple
+            from datetime import datetime
+
+            top_score = semantic_search_results[0][2] # Score is the 3rd element
             print(f"Top semantic search score: {top_score}")
             # Add all semantic results to the candidate pool
-            for memo_id, score in semantic_search_results:
-                if memo_id not in retrieved_memos:
-                    memo = self.get_memo_by_id(memo_id)
-                    if memo:
-                        retrieved_memos[memo_id] = {
-                            "memo": memo,
-                            "score": score,
-                            "source": "semantic"
-                        }
+            for memo_name, content, score in semantic_search_results:
+                if memo_name not in retrieved_memos:
+                    # Create a dummy memo object to avoid a DB call, as we already have the content.
+                    # This makes semantic results compatible with the rest of the function.
+                    DummyMemo = namedtuple('DummyMemo', ['id', 'content', 'created_datetime', 'updated_datetime'])
+                    memo = DummyMemo(
+                        id=memo_name, 
+                        content=content, 
+                        created_datetime=datetime.now(), # Placeholder timestamp
+                        updated_datetime=datetime.now()  # Placeholder timestamp
+                    )
+                    retrieved_memos[memo_name] = {
+                        "memo": memo,
+                        "score": score,
+                        "source": "semantic"
+                    }
 
         # --- Phase 2: Traditional Keyword Search (if needed) ---
         if top_score < settings.retrieval_score_threshold:
