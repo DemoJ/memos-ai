@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     embedding_api_key: str
 
     class Config:
-        env_file = os.path.join(os.path.dirname(__file__), '.env')
+        env_file = os.path.join(os.path.dirname(__file__), '.sync.env')
         env_file_encoding = 'utf-8'
 
 settings = Settings()
