@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     sync_interval_hours: int = 1
     proxy: Optional[str] = None
     retrieval_score_threshold: float = Field(0.7, description="Threshold for filtering search results based on score")
+    memos_webhook_secret: str = ""
+
     
     class Config:
         env_file = ".env"

@@ -13,7 +13,8 @@
 ## 功能特点
 
 - **智能问答**：基于语义搜索 + LLM 生成准确回答
-- **知识同步**：自动同步 Memos 笔记的增删改
+- **实时同步**：通过 Webhook 支持 Memos 笔记的实时创建、更新和删除，变更即时同步。
+- **批量同步**：提供独立脚本，用于首次全量同步或数据校准。
 - **数据本地**：Memos 数据库和向量索引存储在本地，保护隐私
 - **增量更新**：只处理变动的笔记，高效同步
 
@@ -74,6 +75,9 @@ EMBEDDING_API_URL=your_embedding_api_url_here
 EMBEDDING_API_KEY=your_embedding_api_key_here
 EMBEDDING_MODEL=your_embedding_model_name # 例如: bge-m3
 
+# Memos Webhook 密钥 (用于实时同步)
+MEMOS_WEBHOOK_SECRET=your_secret_string_here
+
 # --- 可选配置 ---
 
 # 数据库路径
@@ -87,24 +91,17 @@ MAX_SEARCH_RESULTS=5
 SYNC_INTERVAL_HOURS=1
 ```
 
-### 定时同步
+### 3. Webhook 配置 (推荐, 用于实时同步)
 
-#### Linux/macOS
+为了实现笔记的实时同步，您需要在 Memos 中配置 Webhook。
 
-```bash
-# 添加定时任务
-crontab -e
+1.  在 `.env` 文件中设置 `MEMOS_WEBHOOK_SECRET` 为一个复杂的随机字符串。
+2.  在 Memos 的 `设置` > `Webhook` 中，添加一个新的 Webhook。
+3.  将 URL 设置为 `http://<你的服务地址>:<端口>/api/v1/webhook/memos?secret=<你在.env中设置的密钥>`。
 
-# 每小时同步一次
-0 * * * * /path/to/memos-ai/scripts/auto_sync.sh >> /path/to/memos-ai/logs/sync.log 2>&1
-```
+    - 例如: `http://127.0.0.1:8000/api/v1/webhook/memos?secret=a_very_strong_and_secret_string_12345`
 
-#### Windows
-
-使用任务计划程序，每小时运行：
-```bash
-python scripts/sync.py
-```
+配置完成后，您在 Memos 中的所有变更都会被即时同步到 AI 知识库中。
 
 ## 使用指南
 
@@ -149,6 +146,16 @@ memos-ai/
 └── README.md          # 项目文档
 ```
 
+## TODO (后续优化)
+
+- **文本分块 (Chunking)**：实现更智能的文本分块策略（例如按 Markdown 结构或语义分块），以提升检索单元的语义完整性，避免破坏上下文。
+
+- **检索增强 (Retrieval Enhancement)**：
+  - **混合搜索 (Hybrid Search)**：结合传统的关键词搜索（如 BM25）与向量语义搜索，提高对特定术语、代码片段或缩写的召回准确率。
+  - **重排 (Re-ranking)**：在初步检索后，引入 Cross-Encoder 等更精确的模型对结果进行重排序，以提升最终上下文的精度和相关性。
+
+- **Prompt 工程 (Prompt Engineering)**：根据具体使用场景，持续优化和迭代向 LLM 提问的 Prompt 模板，以获得更稳定、更符合预期的回答质量。
+
 ## 故障排除
 
 ### 常见问题
@@ -180,7 +187,7 @@ python scripts/sync.py --verbose
 ## 技术栈
 
 - **后端**: FastAPI + SQLAlchemy
-- **向量搜索**: FAISS + 在线 Embedding 服务
+- **向量搜索**: ChromaDB + 在线 Embedding 服务
 - **LLM**: OpenAI GPT-3.5/4
 - **数据库**: SQLite (Memos)
 - **前端**: 原生 HTML/CSS/JS
