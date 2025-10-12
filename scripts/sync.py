@@ -11,27 +11,17 @@ import re
 from datetime import datetime
 from typing import List
 
+# 将项目根目录添加到 sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import chromadb
 import numpy as np
 import requests
-from pydantic_settings import BaseSettings
 from sqlalchemy import create_engine, Column, Integer, String, Text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
-# --- 独立配置 ---
-class Settings(BaseSettings):
-    memos_db_path: str = "./memos_prod.db"
-    vector_db_path: str = "./vector_db"
-    embedding_model: str
-    embedding_api_url: str
-    embedding_api_key: str
-
-    class Config:
-        env_file = os.path.join(os.path.dirname(__file__), '.sync.env')
-        env_file_encoding = 'utf-8'
-
-settings = Settings()
+from app.core.config import settings
 
 
 # --- Memos数据库模型 ---
