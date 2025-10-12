@@ -6,6 +6,9 @@ services:
     volumes:
       - ./.env:/app/.env
       - ./memos_prod.db:/app/memos_prod.db
-      - ./vector_db:/app/vector_db
+      - vector_db:/app/vector_db
     ports:
       - "9877:8000"
+
+volumes:
+  vector_db:
