@@ -1,4 +1,3 @@
-
 import chromadb
 from chromadb.config import Settings
 import numpy as np
@@ -28,7 +27,8 @@ class VectorStore:
         }
         try:
             url = f"{settings.embedding_api_url.rstrip('/')}/v1/embeddings"
-            response = requests.post(url, headers=headers, json=payload)
+            print(f"正在调用 Embedding API: {url}")
+            response = requests.post(url, headers=headers, json=payload, timeout=60)
             response.raise_for_status()
             data = response.json()
             embeddings = np.array([item['embedding'] for item in data['data']])
@@ -84,6 +84,15 @@ class VectorStore:
             return
         
         self.collection.delete(ids=doc_ids)
+
+    def get_all_ids(self) -> List[str]:
+        """获取向量数据库中所有文档的ID"""
+        return self.collection.get(include=[])['ids']
+
+    def reset_collection(self):
+        """清空并重建集合，用于全量同步"""
+        self.client.delete_collection(name="memos")
+        self.collection = self.client.get_or_create_collection(name="memos")
 
 # 实例化 VectorStore，供应用其他部分使用
 vector_store = VectorStore()
