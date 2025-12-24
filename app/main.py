@@ -3,7 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.requests import Request
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Union
 
 from app.services.memos_service import memos_service
 from app.services.vector_store import vector_store
@@ -23,7 +23,7 @@ class QuestionRequest(BaseModel):
 class MemoData(BaseModel):
     name: str  # e.g., "memos/BH7pGobxnxUHmV4rLd9EgU"
     content: str
-    visibility: int # e.g., 1 for PRIVATE
+    visibility: Union[str, int] # Can be string ("PRIVATE") or int (1)
 
 class WebhookPayload(BaseModel):
     activityType: str # e.g., "memos.memo.created"
@@ -58,8 +58,17 @@ async def handle_memos_webhook(
         memo_id_str = payload.memo.name
         
         if payload.activityType in ["memos.memo.created", "memos.memo.updated"]:
-            # Assuming visibility 1 is PRIVATE
-            if payload.memo.visibility == 1:
+            # Handle visibility check for both string and int types
+            is_private = False
+            if isinstance(payload.memo.visibility, int):
+                 # Assuming 1 is PRIVATE based on previous logic, adjust if needed
+                 if payload.memo.visibility == 1:
+                     is_private = True
+            elif isinstance(payload.memo.visibility, str):
+                if payload.memo.visibility.upper() == "PRIVATE":
+                    is_private = True
+            
+            if is_private:
                 print(f"Upserting memo '{memo_id_str}'...")
                 # The vector_store expects a list of IDs. We use the string ID directly.
                 vector_store.upsert_documents([payload.memo.content], [memo_id_str])
