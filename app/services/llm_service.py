@@ -59,7 +59,7 @@ class LLMService:
             response = self.client.chat.completions.create(
                 model=settings.llm_model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that decides which tool to use based on the user's question. Respond with only the tool call."},
+                    {"role": "system", "content": "你是一个有用的助手，根据用户的问题决定使用哪个工具。请仅返回工具调用。"},
                     {"role": "user", "content": question}
                 ],
                 tools=tools,
@@ -76,18 +76,18 @@ class LLMService:
         # 在生成答案前过滤上下文
         filtered_context = filter_sensitive_content(context)
         
-        prompt = f"""Based on the following context, please answer the user's question.
-Context:
+        prompt = f"""请回答用户的问题。
+用户笔记中的上下文：
 ---
 {filtered_context}
 ---
-Question: {question}
+用户的问题：{question}
 """
         try:
             stream = self.client.chat.completions.create(
                 model=settings.llm_model,
                 messages=[
-                    {"role": "system", "content": "You are a direct Q&A assistant. Your sole task is to answer the user's question based *only* on the provided 'Context'. You must use the information from the context. If the context contains code, commands, or steps, present them directly as the answer. Do not invent answers or apologize if the context isn't perfect."},
+                    {"role": "system", "content": "你是一个为 Memos 设计的 AI 助手。你的目标是成为一个有用的伙伴，通过你的分析来丰富用户的笔记。在回答时，请将用户笔记中提供的上下文作为你的主要参考，但我们鼓励你在此基础上进行扩展，加入你自己的见解和知识，以提供更全面、更深入的回答。"},
                     {"role": "user", "content": prompt}
                 ],
                 stream=True
@@ -97,26 +97,26 @@ Question: {question}
                     yield chunk.choices[0].delta.content
         except Exception as e:
             logger.error(f"Error generating answer with context: {e}", exc_info=True)
-            yield "Sorry, an error occurred while generating the answer."
+            yield "抱歉，生成回答时遇到错误。"
 
     def validate_context_relevance(self, question: str, context: str) -> bool:
         logger.info(f"Validating context relevance for question: '{question}'")
         prompt = f"""
-User Question: "{question}"
+用户问题: "{question}"
 
-Context:
+上下文:
 ---
 {context}
 ---
 
-Is the provided Context relevant to the User Question and can it be used to answer the question?
-Answer with only "yes" or "no".
+提供的上下文是否与用户问题相关，并且可以用来回答问题？
+请仅用 "是" 或 "否" 回答。
 """
         try:
             response = self.client.chat.completions.create(
                 model=settings.llm_model,
                 messages=[
-                    {"role": "system", "content": "You are a relevance-checking assistant. Your only job is to determine if the provided context can help answer the user's question. Respond with only 'yes' or 'no' in lowercase."},
+                    {"role": "system", "content": "你是一个相关性检查助手。你唯一的任务是判断提供的上下文是否有助于回答用户的问题。请仅用 '是' 或 '否' 回答。"},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=5,
@@ -124,7 +124,7 @@ Answer with only "yes" or "no".
             )
             answer = response.choices[0].message.content.strip().lower()
             logger.info(f"Relevance validation response: '{answer}'")
-            return "yes" in answer
+            return "是" in answer
         except Exception as e:
             logger.error(f"Error validating context relevance: {e}", exc_info=True)
             return False
@@ -135,7 +135,7 @@ Answer with only "yes" or "no".
             stream = self.client.chat.completions.create(
                 model=settings.llm_model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant. Answer the user's question to the best of your ability."},
+                    {"role": "system", "content": "你是一个乐于助人的助手。请尽你所能回答用户的问题。"},
                     {"role": "user", "content": question}
                 ],
                 stream=True
@@ -145,7 +145,7 @@ Answer with only "yes" or "no".
                     yield chunk.choices[0].delta.content
         except Exception as e:
             logger.error(f"Error generating answer without context: {e}", exc_info=True)
-            yield "Sorry, an error occurred while generating the answer."
+            yield "抱歉，生成回答时遇到错误。"
 
     def extract_keywords(self, question: str, max_keywords: int = 5) -> List[str]:
         """Extracts keywords from a question using the LLM."""
@@ -153,18 +153,18 @@ Answer with only "yes" or "no".
         logger.info(f"Extracting keywords from question: '{question}'")
         
         prompt = f"""
-        From the following user question, extract the most relevant keywords for a database search.
-        Return the keywords as a JSON list of strings.
-        For example, for the question "How do I renew my K3S certificate?", the output should be ["K3S", "certificate", "renew"].
-        Do not return more than {max_keywords} keywords.
+        请从以下用户问题中提取最相关的关键词用于数据库搜索。
+        以 JSON 字符串列表的格式返回关键词。
+        例如，对于问题 "如何更新我的 K3S 证书？"，输出应为 ["K3S", "证书", "更新"]。
+        返回的关键词不要超过 {max_keywords} 个。
 
-        Question: "{question}"
+        问题: "{question}"
         """
         try:
             response = self.client.chat.completions.create(
                 model=settings.llm_model,
                 messages=[
-                    {"role": "system", "content": "You are an expert in keyword extraction. You only respond with a JSON list of strings."},
+                    {"role": "system", "content": "你是关键词提取专家。请仅以 JSON 字符串列表的格式回应。"},
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
