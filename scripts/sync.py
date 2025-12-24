@@ -81,13 +81,12 @@ class MemosSync:
             
             changed_memos = filter_sensitive_memos(changed_memos)
             
-            current_db_ids = {memo.id for memo in session.query(Memo).filter(
+            current_db_ids = {str(memo.id) for memo in session.query(Memo).filter(
                 Memo.row_status == "NORMAL",
                 Memo.visibility == "PRIVATE"
             ).all()}
             
-            vector_db_ids_str = vector_store.get_all_ids()
-            vector_db_ids = {int(id) for id in vector_db_ids_str}
+            vector_db_ids = set(vector_store.get_all_ids())
             
             deleted_memo_ids = list(vector_db_ids - current_db_ids)
             
